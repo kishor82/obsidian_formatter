@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func processMarkdownFiles(rootDir string) error {
+func processMarkdownFiles(rootDir string, githubRoot string) error {
   imageDir := filepath.Join(rootDir, "images")
   err := os.MkdirAll(imageDir, os.ModePerm);
 
@@ -34,7 +34,7 @@ func processMarkdownFiles(rootDir string) error {
     if !info.IsDir() && strings.HasSuffix(info.Name(), ".md") {
       // update markdown images
       fmt.Println(path);
-      err := convertObsidianToGitHub(path)
+      err := convertObsidianToGitHub(path, githubRoot)
       if err != nil {
         return err
       }
@@ -53,7 +53,7 @@ func isImageFile(file string) bool {
 }
 
 // Converts Obsidian-style image references to GitHub Markdown format
-func convertObsidianToGitHub(mdFile string) error {
+func convertObsidianToGitHub(mdFile string, githubRoot string) error {
 	content, err := ioutil.ReadFile(mdFile)
 	if err != nil {
 		return err
@@ -67,7 +67,10 @@ func convertObsidianToGitHub(mdFile string) error {
 			imagePath := matches[1]
       updatedImageName := strings.ReplaceAll(imagePath, " ", "_") 
 			imageName := filepath.Base(updatedImageName) // Extract just the filename
-			return fmt.Sprintf("![%s](images/%s)", imageName, imageName) // Convert to GitHub format
+
+      // GitHub absolute URL
+      githubImageURL := fmt.Sprintf("%s%s/%s", githubRoot ,"images", imageName);
+			return fmt.Sprintf("![%s](%s)", imageName, githubImageURL) // Convert to GitHub format
 		}
 		return match
 	})
@@ -76,9 +79,15 @@ func convertObsidianToGitHub(mdFile string) error {
 }
 
 func main() {
-  println("Hello there, I am Kishor Rathva");
+  var githubRoot string
+	if len(os.Args) > 1 {
+		githubRoot = os.Args[1]
+	} else {
+		fmt.Println("Error: GitHub root URL is required (e.g., https://github.com/user/repo/blob/main/)")
+		os.Exit(1)
+	}
   rootDir := "."
-  err := processMarkdownFiles(rootDir)
+  err := processMarkdownFiles(rootDir, githubRoot)
 
   if err != nil {
     fmt.Println("Error processing files:", err)
