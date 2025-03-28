@@ -1,4 +1,4 @@
 # Here is the image
-![[image.png]]
+![image.png](images/image.png)
 
 
