@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -24,14 +25,16 @@ func processMarkdownFiles(rootDir string) error {
 
     // Mode images
     if !info.IsDir() && isImageFile(path){
-      newPath := filepath.Join(imageDir,info.Name())
+      updatedName := strings.ReplaceAll(info.Name(), " ", "_")
+      newPath := filepath.Join(imageDir,updatedName)
       os.Rename(path, newPath)
     }
 
     // update markdown files 
     if !info.IsDir() && strings.HasSuffix(info.Name(), ".md") {
       // update markdown images
-      err := updateMarkdownImages(path)
+      fmt.Println(path);
+      err := convertObsidianToGitHub(path)
       if err != nil {
         return err
       }
@@ -49,35 +52,27 @@ func isImageFile(file string) bool {
   return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif"
 }
 
-// updateMarkdown images
-func updateMarkdownImages(mdFile string) error {
-  content, err := os.ReadFile(mdFile)
-  if err != nil {
-    return err
-  }
+// Converts Obsidian-style image references to GitHub Markdown format
+func convertObsidianToGitHub(mdFile string) error {
+	content, err := ioutil.ReadFile(mdFile)
+	if err != nil {
+		return err
+	}
 
-  // find all images in the file
-  re := regexp.MustCompile(`!\[.*?\]\((.*?)\)`)
-  updatedContent := re.ReplaceAllFunc(content, func(match []byte) []byte {
-    // Extract the image URL from the match
-    url := string(match[2 : len(match)-1])
-    // Check if the URL is a relative path
-    if !strings.HasPrefix(url, "http") {
-      // Replace relative path with absolute path
-      baseDir := filepath.Dir(mdFile)
-      newURL := filepath.Join(baseDir, url)
-      return []byte(fmt.Sprintf("![%s](%s)", match[1], newURL))
-    }
-    return match
-  })
+	// Regex for Obsidian image format: ![[image.png]]
+	re := regexp.MustCompile(`!\[\[(.*?)\]\]`)
+	updatedContent := re.ReplaceAllStringFunc(string(content), func(match string) string {
+		matches := re.FindStringSubmatch(match)
+		if len(matches) > 1 {
+			imagePath := matches[1]
+      updatedImageName := strings.ReplaceAll(imagePath, " ", "_") 
+			imageName := filepath.Base(updatedImageName) // Extract just the filename
+			return fmt.Sprintf("![%s](images/%s)", imageName, imageName) // Convert to GitHub format
+		}
+		return match
+	})
 
-  // write the updated content back to the file
-  err = os.WriteFile(mdFile, updatedContent, 0644)
-  if err != nil {
-    return err
-  }
-
-  return nil
+	return ioutil.WriteFile(mdFile, []byte(updatedContent), 0644)
 }
 
 func main() {
